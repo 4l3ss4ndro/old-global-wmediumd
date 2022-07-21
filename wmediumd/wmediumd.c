@@ -870,7 +870,7 @@ static void sock_event_cb(int fd, short what, void *data)
  * Setup socket to global wmediumd
  */
 
-void socket_client(struct nl_msg *msg, void *arg)
+void socket_server(struct nl_msg *msg, void *arg)
 	int sockfd, connfd;
 	struct sockaddr_in servaddr, cli;
 	int n;
@@ -927,9 +927,9 @@ void socket_client(struct nl_msg *msg, void *arg)
 	// close the socket
 	close(sockfd);
 /*
- * Setup global wmediumd socket and callbacks.
+ * Setup local wmediumd socket and callbacks.
  */
-static int global_w_cb(struct nl_msg *msg, void *arg)
+static int local_w_cb(struct nl_msg *msg, void *arg)
 {
 	/*pass msg and arg to global wmediumd and call global process_messages_cb()*/
 	struct wmediumd *ctx = arg;
@@ -977,7 +977,7 @@ static int init_netlink(struct wmediumd *ctx)
 		return -1;
 	}
 
-	nl_cb_set(ctx->cb, NL_CB_MSG_IN, NL_CB_CUSTOM, global_w_cb, ctx);
+	nl_cb_set(ctx->cb, NL_CB_MSG_IN, NL_CB_CUSTOM, process_messages_cb, ctx);
 	nl_cb_err(ctx->cb, NL_CB_CUSTOM, nl_err_cb, ctx);
 
 	return 0;
@@ -1124,7 +1124,9 @@ int main(int argc, char *argv[])
 	/* init netlink */
 	if (init_netlink(&ctx) < 0)
 		return EXIT_FAILURE;
-
+	
+	socket_server();
+	
 	event_set(&ev_cmd, nl_socket_get_fd(ctx.sock), EV_READ | EV_PERSIST,
 		  sock_event_cb, &ctx);
 	event_add(&ev_cmd, NULL);
