@@ -1,5 +1,7 @@
 # Introduction
 
+Forked from ramonfontes/wmediumd.
+
 This is a wireless medium simulation tool for Linux, based on the netlink API
 implemented in the `mac80211_hwsim` kernel driver.  Unlike the default in-kernel
 forwarding mode of `mac80211_hwsim`, wmediumd allows simulating frame loss and
