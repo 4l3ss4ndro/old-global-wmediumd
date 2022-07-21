@@ -749,12 +749,9 @@ int nl_err_cb(struct sockaddr_nl *nla, struct nlmsgerr *nlerr, void *arg)
  * Handle events from the kernel.  Process CMD_FRAME events and queue them
  * for later delivery with the scheduler.
  */
-static int process_messages_cb(struct nl_msg *msg, void *arg)
+static int process_messages_cb(struct nlmsghdr *nlh, struct wmediumd *ctx)
 {
-	struct wmediumd *ctx = arg;
 	struct nlattr *attrs[HWSIM_ATTR_MAX+1];
-	/* netlink header */
-	struct nlmsghdr *nlh = nlmsg_hdr(msg);
 	/* generic netlink header*/
 	struct genlmsghdr *gnlh = nlmsg_data(nlh);
 
@@ -867,82 +864,65 @@ static void sock_event_cb(int fd, short what, void *data)
 }
 
 /*
- * Setup socket to global wmediumd
+ * Setup socket to local wmediumd
  */
 
-void socket_server(struct nl_msg *msg, void *arg)
-	int sockfd, connfd;
-	struct sockaddr_in servaddr, cli;
-	int n;
-	struct wmediumd *ctx = arg;
-	struct nlmsghdr *nlh = nlmsg_hdr(msg);
+void socket_server(void)
+{		
+	struct wmediumd *ctx;
+	struct nlmsghdr *nlh;    
+	int server_fd, new_socket, valread;
+	struct sockaddr_in address;
+	int opt = 1;
+	int addrlen = sizeof(address);
+	char buffer[1024] = { 0 };
 
-	// socket create and verification
-	sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if (sockfd == -1) {
-		printf("socket creation failed...\n");
-		exit(0);
-	}
-	else
-		printf("Socket successfully created..\n");
-	bzero(&servaddr, sizeof(servaddr));
-
-	// assign IP, PORT
-	servaddr.sin_family = AF_INET;
-	servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-	servaddr.sin_port = htons(PORT);
-
-	// connect the client socket to server socket
-	if (connect(sockfd, (SA*)&servaddr, sizeof(servaddr)) != 0) {
-		printf("connection with the server failed...\n");
-		exit(0);
-	}
-	else
-		printf("connected to the server..\n");
-
-	// chat
-	for (;;) {
-		bzero(&ctx, sizeof(&ctx));
-		n = 0;
-		// send it over 
-		if (nbytes = write(sockfd, &ctx, sizeof(ctx)) != sizeof(ctx))
-		{
-		  printf("error writing my message");
-		}
-		bzero(&nlh, sizeof(&nlh));
-		n = 0;
-		// send it over 
-		if (nbytes = write(sockfd, &nlh, sizeof(nlh)) != sizeof(nlh))
-		{
-		  printf("error writing my second message");
-		}	
-		read(sockfd, buff, sizeof(buff));
-		printf("From Server : %s", buff);
-		if ((strncmp(buff, "exit", 4)) == 0) {
-			printf("Client Exit...\n");
-			break;
-		}
+	// Creating socket file descriptor
+	if ((server_fd = socket(AF_INET, SOCK_STREAM, 0))
+	== 0) {
+	perror("socket failed");
+	exit(EXIT_FAILURE);
 	}
 
-	// close the socket
-	close(sockfd);
-/*
- * Setup local wmediumd socket and callbacks.
- */
-static int local_w_cb(struct nl_msg *msg, void *arg)
-{
-	/*pass msg and arg to global wmediumd and call global process_messages_cb()*/
-	struct wmediumd *ctx = arg;
-	struct nlmsghdr *nlh = nlmsg_hdr(msg);
-	struct genlmsghdr *gnlh = nlmsg_data(nlh);
-	
-	if (gnlh->cmd == HWSIM_CMD_FRAME)
+	// Forcefully attaching socket to the port 8080
+	if (setsockopt(server_fd, SOL_SOCKET,
+		   SO_REUSEADDR | SO_REUSEPORT, &opt,
+		   sizeof(opt))) {
+	perror("setsockopt");
+	exit(EXIT_FAILURE);
+	}
+	address.sin_family = AF_INET;
+	address.sin_addr.s_addr = INADDR_ANY;
+	address.sin_port = htons(PORT);
+
+	// Forcefully attaching socket to the port 8080
+	if (bind(server_fd, (struct sockaddr*)&address,
+	     sizeof(address))
+	< 0) {
+	perror("bind failed");
+	exit(EXIT_FAILURE);
+	}
+	if (listen(server_fd, 3) < 0) {
+	perror("listen");
+	exit(EXIT_FAILURE);
+	}
+	if( (size = recv ( sockfd, (void*)&ctx, sizeof(wmediumd), 0)) >= 0)
 	{
-	socket_client(msg,ctx);	
+	     
 	}
-	
-	return 0;
-}	
+	if( (size = recv ( sockfd, (void*)&nlh, sizeof(nlmsghdr), 0)) >= 0)
+	{
+   	    
+	}
+	valread = read(new_socket, buffer, 1024);
+
+	//send(new_socket, hello, strlen(hello), 0);
+
+	// closing the connected socket
+	close(new_socket);
+	// closing the listening socket
+	shutdown(server_fd, SHUT_RDWR);
+}
 /*
  * Setup netlink socket and callbacks.
  */
@@ -976,7 +956,9 @@ static int init_netlink(struct wmediumd *ctx)
 		w_logf(ctx, LOG_ERR, "Family MAC80211_HWSIM not registered\n");
 		return -1;
 	}
-
+	
+	socket_server();
+	
 	nl_cb_set(ctx->cb, NL_CB_MSG_IN, NL_CB_CUSTOM, process_messages_cb, ctx);
 	nl_cb_err(ctx->cb, NL_CB_CUSTOM, nl_err_cb, ctx);
 
@@ -1124,8 +1106,6 @@ int main(int argc, char *argv[])
 	/* init netlink */
 	if (init_netlink(&ctx) < 0)
 		return EXIT_FAILURE;
-	
-	socket_server();
 	
 	event_set(&ev_cmd, nl_socket_get_fd(ctx.sock), EV_READ | EV_PERSIST,
 		  sock_event_cb, &ctx);
