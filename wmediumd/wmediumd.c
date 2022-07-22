@@ -680,6 +680,11 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 	u8 *src = frame->sender->addr;
 	int flag[10]; //10 is the max number of stations, it can be changed based on it (even on the local wmediumd)
 	int counter = 0;
+	int j = 0;
+	
+	for (j = 0; j < 10 ; j++){
+        	flag[j] = 100;
+   	 }
 
 	if (frame->flags & HWSIM_TX_STAT_ACK) {
 		/* rx the frame on the dest interface */
