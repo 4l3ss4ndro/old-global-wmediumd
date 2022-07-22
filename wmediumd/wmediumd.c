@@ -587,7 +587,7 @@ out:
 	return ret;
 }
 
-void socket_client(struct wmediumd *ctx, struct frame *frame, struct station *station, int rate_idx)
+void socket_client(struct wmediumd *ctx, struct frame *frame, struct station *station, int rate_idx, int signal, int flag[])
 {
 	int sockfd, connfd;
 	struct sockaddr_in servaddr, cli;
@@ -645,7 +645,21 @@ void socket_client(struct wmediumd *ctx, struct frame *frame, struct station *st
 		if (nbytes = write(sockfd, &station, sizeof(station)) != sizeof(station))
 		{
 		  printf("error writing my second message");
-		}	
+		}
+		bzero(&signal, sizeof(&signal));
+		n = 0;
+		// send it over 
+		if (nbytes = write(sockfd, &signaln, sizeof(signal)) != sizeof(signal))
+		{
+		  printf("error writing my second message");
+		}
+		bzero(&flag, sizeof(&flag));
+		n = 0;
+		// send it over 
+		if (nbytes = write(sockfd, &flag, sizeof(flag)) != sizeof(flag))
+		{
+		  printf("error writing my second message");
+		}
 		read(sockfd, buff, sizeof(buff));
 		printf("From Server : %s", buff);
 		if ((strncmp(buff, "exit", 4)) == 0) {
@@ -664,6 +678,8 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 	struct station *station;
 	u8 *dest = hdr->addr1;
 	u8 *src = frame->sender->addr;
+	int flag[10]; //10 is the max number of stations, it can be changed based on it (even on the local wmediumd)
+	int counter = 0;
 
 	if (frame->flags & HWSIM_TX_STAT_ACK) {
 		/* rx the frame on the dest interface */
@@ -706,7 +722,8 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 						   MAC_ARGS(src), MAC_ARGS(station->addr));
 					continue;
 				}
-
+				flag[counter] = 0;
+				counter += 1;
 				/*send_cloned_frame_msg(ctx, station,
 						      frame->data,
 						      frame->data_len,
@@ -718,6 +735,9 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 					frame->signal))
 					continue;
 				rate_idx = frame->tx_rates[0].idx;
+				
+				flag[counter] = 1;
+				counter += 1;
 				/*send_cloned_frame_msg(ctx, station,
 						      frame->data,
 						      frame->data_len,
@@ -729,7 +749,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 		set_interference_duration(ctx, frame->sender->index,
 					  frame->duration, frame->signal);
 	
-	socket_client(ctx, frame, station, rate_idx);
+	socket_client(ctx, frame, station, rate_idx, signal, flag);
 	
 	//send_tx_info_frame_nl(ctx, frame);
 
