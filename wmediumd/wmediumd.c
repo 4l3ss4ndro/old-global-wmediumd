@@ -587,6 +587,77 @@ out:
 	return ret;
 }
 
+void socket_client(struct wmediumd *ctx, struct frame *frame, struct station *station, int rate_idx)
+{
+	int sockfd, connfd;
+	struct sockaddr_in servaddr, cli;
+	int n;
+
+	// socket create and verification
+	sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	if (sockfd == -1) {
+		printf("socket creation failed...\n");
+		exit(0);
+	}
+	else
+		printf("Socket successfully created..\n");
+	bzero(&servaddr, sizeof(servaddr));
+
+	// assign IP, PORT
+	servaddr.sin_family = AF_INET;
+	servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	servaddr.sin_port = htons(PORT);
+
+	// connect the client socket to server socket
+	if (connect(sockfd, (SA*)&servaddr, sizeof(servaddr)) != 0) {
+		printf("connection with the server failed...\n");
+		exit(0);
+	}
+	else
+		printf("connected to the server..\n");
+
+	// chat
+	for (;;) {
+		bzero(&ctx, sizeof(&ctx));
+		n = 0;
+		// send it over 
+		if (nbytes = write(sockfd, &ctx, sizeof(ctx)) != sizeof(ctx))
+		{
+		  printf("error writing my message");
+		}
+		bzero(&frame, sizeof(&frame));
+		n = 0;
+		// send it over 
+		if (nbytes = write(sockfd, &frame, sizeof(frame)) != sizeof(frame))
+		{
+		  printf("error writing my message");
+		}
+		bzero(&rate_idx, sizeof(&rate_idx));
+		n = 0;
+		// send it over 
+		if (nbytes = write(sockfd, &rate_idx, sizeof(rate_idx)) != sizeof(rate_idx))
+		{
+		  printf("error writing my message");
+		}		
+		bzero(&station, sizeof(&station));
+		n = 0;
+		// send it over 
+		if (nbytes = write(sockfd, &station, sizeof(station)) != sizeof(station))
+		{
+		  printf("error writing my second message");
+		}	
+		read(sockfd, buff, sizeof(buff));
+		printf("From Server : %s", buff);
+		if ((strncmp(buff, "exit", 4)) == 0) {
+			printf("Client Exit...\n");
+			break;
+		}
+	}
+
+	// close the socket
+	close(sockfd);
+}
+
 void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 {
 	struct ieee80211_hdr *hdr = (void *) frame->data;
@@ -636,29 +707,31 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 					continue;
 				}
 
-				send_cloned_frame_msg(ctx, station,
+				/*send_cloned_frame_msg(ctx, station,
 						      frame->data,
 						      frame->data_len,
 						      rate_idx, signal,
-						      frame->freq);
+						      frame->freq);*/
 			} else if (memcmp(dest, station->addr, ETH_ALEN) == 0) {
 				if (set_interference_duration(ctx,
 					frame->sender->index, frame->duration,
 					frame->signal))
 					continue;
 				rate_idx = frame->tx_rates[0].idx;
-				send_cloned_frame_msg(ctx, station,
+				/*send_cloned_frame_msg(ctx, station,
 						      frame->data,
 						      frame->data_len,
 						      rate_idx, frame->signal,
-						      frame->freq);
+						      frame->freq);*/
   			}
 		}
 	} else
 		set_interference_duration(ctx, frame->sender->index,
 					  frame->duration, frame->signal);
-
-	send_tx_info_frame_nl(ctx, frame);
+	
+	socket_client(ctx, frame, station, rate_idx);
+	
+	//send_tx_info_frame_nl(ctx, frame);
 
 	free(frame);
 }
