@@ -662,9 +662,7 @@ void socket_client(struct wmediumd *ctx, struct frame *frame, struct station *st
 		}
 		read(sockfd, buff, sizeof(buff));
 		printf("From Server : %s", buff);
-		if ((strncmp(buff, "exit", 4)) == 0) {
-			printf("Client Exit...\n");
-			break;
+		break;
 		}
 	}
 
