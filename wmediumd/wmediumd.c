@@ -599,8 +599,9 @@ void socket_client(struct wmediumd *ctx, struct frame *frame, struct station *st
 		printf("socket creation failed...\n");
 		exit(0);
 	}
-	else
+	else{
 		printf("Socket successfully created..\n");
+	}
 	bzero(&servaddr, sizeof(servaddr));
 
 	// assign IP, PORT
@@ -613,57 +614,33 @@ void socket_client(struct wmediumd *ctx, struct frame *frame, struct station *st
 		printf("connection with the server failed...\n");
 		exit(0);
 	}
-	else
+	else{
 		printf("connected to the server..\n");
-
+	}
 	// chat
-	for (;;) {
-		bzero(&ctx, sizeof(&ctx));
-		n = 0;
-		// send it over 
-		if (nbytes = write(sockfd, &ctx, sizeof(ctx)) != sizeof(ctx))
-		{
-		  printf("error writing my message");
-		}
-		bzero(&frame, sizeof(&frame));
-		n = 0;
-		// send it over 
-		if (nbytes = write(sockfd, &frame, sizeof(frame)) != sizeof(frame))
-		{
-		  printf("error writing my message");
-		}
-		bzero(&rate_idx, sizeof(&rate_idx));
-		n = 0;
-		// send it over 
-		if (nbytes = write(sockfd, &rate_idx, sizeof(rate_idx)) != sizeof(rate_idx))
-		{
-		  printf("error writing my message");
-		}		
-		bzero(&station, sizeof(&station));
-		n = 0;
-		// send it over 
-		if (nbytes = write(sockfd, &station, sizeof(station)) != sizeof(station))
-		{
-		  printf("error writing my second message");
-		}
-		bzero(&signal, sizeof(&signal));
-		n = 0;
-		// send it over 
-		if (nbytes = write(sockfd, &signaln, sizeof(signal)) != sizeof(signal))
-		{
-		  printf("error writing my second message");
-		}
-		bzero(&flag, sizeof(&flag));
-		n = 0;
-		// send it over 
-		if (nbytes = write(sockfd, &flag, sizeof(flag)) != sizeof(flag))
-		{
-		  printf("error writing my second message");
-		}
-		read(sockfd, buff, sizeof(buff));
-		printf("From Server : %s", buff);
-		break;
-		}
+	if (nbytes = write(sockfd, &ctx, sizeof(ctx)) != sizeof(ctx))
+	{
+	  printf("error writing ctx");
+	}
+	if (nbytes = write(sockfd, &frame, sizeof(frame)) != sizeof(frame))
+	{
+	  printf("error writing frame");
+	}
+	if (nbytes = write(sockfd, &rate_idx, sizeof(rate_idx)) != sizeof(rate_idx))
+	{
+	  printf("error writing rate_idx");
+	}		
+	if (nbytes = write(sockfd, &station, sizeof(station)) != sizeof(station))
+	{
+	  printf("error writing station");
+	}
+	if (nbytes = write(sockfd, &signal, sizeof(signal)) != sizeof(signal))
+	{
+	  printf("error writing signal");
+	}
+	if (nbytes = write(sockfd, &flag, sizeof(flag)) != sizeof(flag))
+	{
+	  printf("error writing flag");
 	}
 
 	// close the socket
@@ -960,11 +937,12 @@ static void sock_event_cb(int fd, short what, void *data)
 }
 
 /*
- * Setup socket to local wmediumd
+ * Setup netlink socket and callbacks.
  */
-
-void socket_server(void)
-{		
+static int init_netlink(struct wmediumd *ctx)
+{
+	struct nl_sock *sock;
+	int ret;
 	struct wmediumd *ctx;
 	struct nlmsghdr *nlh;    
 	int server_fd, new_socket, valread;
@@ -973,6 +951,32 @@ void socket_server(void)
 	int addrlen = sizeof(address);
 	char buffer[1024] = { 0 };
 
+	ctx->cb = nl_cb_alloc(NL_CB_CUSTOM);
+	if (!ctx->cb) {
+		w_logf(ctx, LOG_ERR, "Error allocating netlink callbacks\n");
+		return -1;
+	}
+
+	sock = nl_socket_alloc_cb(ctx->cb);
+	if (!sock) {
+		w_logf(ctx, LOG_ERR, "Error allocating netlink socket\n");
+		return -1;
+	}
+
+	ctx->sock = sock;
+
+	ret = genl_connect(sock);
+	if (ret < 0) {
+		w_logf(ctx, LOG_ERR, "Error connecting netlink socket ret=%d\n", ret);
+		return -1;
+	}
+
+	ctx->family_id = genl_ctrl_resolve(sock, "MAC80211_HWSIM");
+	if (ctx->family_id < 0) {
+		w_logf(ctx, LOG_ERR, "Family MAC80211_HWSIM not registered\n");
+		return -1;
+	}
+	///////////////// Socket server starts here//////////////////////
 	// Creating socket file descriptor
 	if ((server_fd = socket(AF_INET, SOCK_STREAM, 0))
 	== 0) {
@@ -1003,58 +1007,17 @@ void socket_server(void)
 	exit(EXIT_FAILURE);
 	}
 	if( (size = recv ( sockfd, (void*)&ctx, sizeof(wmediumd), 0)) >= 0)
-	{
-	     
+	{	     
 	}
 	if( (size = recv ( sockfd, (void*)&nlh, sizeof(nlmsghdr), 0)) >= 0)
-	{
-   	    
+	{ 	    
 	}
-	valread = read(new_socket, buffer, 1024);
-
-	//send(new_socket, hello, strlen(hello), 0);
-
+	
 	// closing the connected socket
 	close(new_socket);
 	// closing the listening socket
 	shutdown(server_fd, SHUT_RDWR);
-}
-/*
- * Setup netlink socket and callbacks.
- */
-static int init_netlink(struct wmediumd *ctx)
-{
-	struct nl_sock *sock;
-	int ret;
-
-	ctx->cb = nl_cb_alloc(NL_CB_CUSTOM);
-	if (!ctx->cb) {
-		w_logf(ctx, LOG_ERR, "Error allocating netlink callbacks\n");
-		return -1;
-	}
-
-	sock = nl_socket_alloc_cb(ctx->cb);
-	if (!sock) {
-		w_logf(ctx, LOG_ERR, "Error allocating netlink socket\n");
-		return -1;
-	}
-
-	ctx->sock = sock;
-
-	ret = genl_connect(sock);
-	if (ret < 0) {
-		w_logf(ctx, LOG_ERR, "Error connecting netlink socket ret=%d\n", ret);
-		return -1;
-	}
-
-	ctx->family_id = genl_ctrl_resolve(sock, "MAC80211_HWSIM");
-	if (ctx->family_id < 0) {
-		w_logf(ctx, LOG_ERR, "Family MAC80211_HWSIM not registered\n");
-		return -1;
-	}
-	
-	socket_server();
-	
+	///////////////// Socket server ends here//////////////////////
 	nl_cb_set(ctx->cb, NL_CB_MSG_IN, NL_CB_CUSTOM, process_messages_cb, ctx);
 	nl_cb_err(ctx->cb, NL_CB_CUSTOM, nl_err_cb, ctx);
 
