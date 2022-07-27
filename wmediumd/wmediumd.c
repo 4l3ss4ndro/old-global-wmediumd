@@ -626,7 +626,7 @@ void socket_client(struct wmediumd *ctx, struct frame *frame, struct station *st
 	{
 	  printf("error writing frame");
 	}
-	if (nbytes = write(sockfd, &rate_idx, sizeof(rate_idx)) != sizeof(rate_idx))
+	if (nbytes = write(sockfd, &rate_idx, sizeof(rate_idx_array)) != sizeof(rate_idx_array))
 	{
 	  printf("error writing rate_idx");
 	}		
@@ -654,11 +654,13 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 	u8 *dest = hdr->addr1;
 	u8 *src = frame->sender->addr;
 	int flag[10]; //10 is the max number of stations, it can be changed based on it (even on the local wmediumd)
+	int rate_idx_array[10];
 	int counter = 0;
 	int j = 0;
 	
 	for (j = 0; j < 10 ; j++){
         	flag[j] = 100;
+		rate_idx_array[j] = 0;
    	 }
 
 	if (frame->flags & HWSIM_TX_STAT_ACK) {
@@ -703,6 +705,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 					continue;
 				}
 				flag[counter] = 0;
+				rate_idx_array[counter] = rate_idx;
 				counter += 1;
 				/*send_cloned_frame_msg(ctx, station,
 						      frame->data,
@@ -717,6 +720,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 				rate_idx = frame->tx_rates[0].idx;
 				
 				flag[counter] = 1;
+				rate_idx_array[counter] = rate_idx;
 				counter += 1;
 				/*send_cloned_frame_msg(ctx, station,
 						      frame->data,
